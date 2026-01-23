@@ -4,6 +4,7 @@ dist/
 .cache/
 *.log
 .vite/
+users-db.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

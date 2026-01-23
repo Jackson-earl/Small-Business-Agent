@@ -1,10 +1,9 @@
 // Frontend, Button + Chat UI
 
 import React, { useState, useEffect, useRef } from 'react';
-import Anthropic from '@anthropic-ai/sdk';
 
 // This is the button + chat interface your users will interact with
-function MeetingAssistant() {
+function MeetingAssistant({ userId, isConnected }) {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -62,6 +61,14 @@ function MeetingAssistant() {
 
   const handleClick = () => {
     if (!hasDragged.current) {
+      if (!userId) {
+        alert('Please enter your email first!');
+        return;
+      }
+      if (!isConnected) {
+        alert('Please connect your Google Calendar first!');
+        return;
+      }
       setIsOpen(true);
     }
   };
@@ -87,9 +94,10 @@ function MeetingAssistant() {
       const response = await fetch('/api/agent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           message: input,
-          conversationHistory: messages 
+          userId: userId,
+          conversationHistory: messages
         })
       });
 

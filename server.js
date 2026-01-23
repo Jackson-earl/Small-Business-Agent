@@ -2,26 +2,28 @@ import express from 'express';
 import dotenv from 'dotenv';
 import Anthropic from '@anthropic-ai/sdk';
 import { ZoomClient } from './main/lib/zoom-client.js';
-import { GoogleCalendarClient } from './main/lib/calendar-client.js';
+import { GoogleOAuthClient } from './main/lib/google-oauth-client.js';
+import { db } from './main/lib/database.js';
 
-// Load environment variables from envvars.env
+// Load environment variables
 dotenv.config({ path: 'envvars.env' });
 
 const app = express();
 app.use(express.json());
 
+// Initialize clients
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY
 });
 
-// Initialize service clients
 const zoomClient = new ZoomClient({
   accountId: process.env.ZOOM_ACCOUNT_ID,
   clientId: process.env.ZOOM_CLIENT_ID,
-  clientSecret: process.env.ZOOM_CLIENT_SECRET
+  clientSecret: process.env.ZOOM_CLIENT_SECRET,
+  userEmail: process.env.ZOOM_USER_EMAIL
 });
 
-const calendarClient = new GoogleCalendarClient({
+const googleClient = new GoogleOAuthClient({
   clientId: process.env.GOOGLE_CLIENT_ID,
   clientSecret: process.env.GOOGLE_CLIENT_SECRET,
   redirectUri: process.env.GOOGLE_REDIRECT_URI
@@ -30,106 +32,137 @@ const calendarClient = new GoogleCalendarClient({
 // System prompt for Claude
 const SYSTEM_PROMPT = `You are a helpful meeting scheduling assistant. You can:
 1. Create Zoom meetings
-2. Add events to Google Calendar
-3. Coordinate both to ensure calendar events include meeting links
+2. Add events to the user's Google Calendar
 
 When a user asks to schedule a meeting:
-1. First create the Zoom meeting
-2. Then create a calendar event with the Zoom link in the description and location
+1. First create the Zoom meeting using create_zoom_meeting
+2. Then create a calendar event using create_calendar_event with the Zoom link in the description and location
 
-Be conversational and friendly. Confirm what you've done clearly.`;
+Be conversational and friendly. Confirm what you've done clearly with all meeting details.`;
 
 // Define the tools Claude can use
 const tools = [
   {
     name: "create_zoom_meeting",
-    description: "Creates a new Zoom meeting. Returns meeting URL, ID, and passcode.",
+    description: "Creates a Zoom meeting and returns join URL, meeting ID, and passcode",
     input_schema: {
       type: "object",
       properties: {
-        topic: {
-          type: "string",
-          description: "Meeting title/topic"
-        },
-        start_time: {
-          type: "string",
-          description: "ISO 8601 datetime (e.g., 2024-01-15T14:00:00Z)"
-        },
-        duration: {
-          type: "number",
-          description: "Duration in minutes"
-        },
-        agenda: {
-          type: "string",
-          description: "Meeting agenda or description"
-        }
+        topic: { type: "string", description: "Meeting title" },
+        start_time: { type: "string", description: "ISO 8601 datetime (e.g., 2024-01-23T14:00:00Z)" },
+        duration: { type: "number", description: "Duration in minutes" },
+        agenda: { type: "string", description: "Meeting agenda" }
       },
       required: ["topic", "start_time", "duration"]
     }
   },
   {
     name: "create_calendar_event",
-    description: "Creates a new Google Calendar event",
+    description: "Creates a Google Calendar event on the user's personal calendar",
     input_schema: {
       type: "object",
       properties: {
-        summary: {
-          type: "string",
-          description: "Event title"
-        },
-        start_time: {
-          type: "string",
-          description: "ISO 8601 datetime"
-        },
-        end_time: {
-          type: "string",
-          description: "ISO 8601 datetime"
-        },
-        description: {
-          type: "string",
-          description: "Event description (can include meeting links)"
-        },
-        location: {
-          type: "string",
-          description: "Event location or meeting URL"
-        }
+        summary: { type: "string", description: "Event title" },
+        start_time: { type: "string", description: "ISO 8601 datetime" },
+        end_time: { type: "string", description: "ISO 8601 datetime" },
+        description: { type: "string", description: "Event description (include meeting link)" },
+        location: { type: "string", description: "Meeting URL or location" }
       },
       required: ["summary", "start_time", "end_time"]
     }
   }
 ];
 
-// Handle tool execution
-async function executeToolCall(toolName, toolInput) {
-  switch (toolName) {
-    case "create_zoom_meeting":
-      return await zoomClient.createMeeting({
-        topic: toolInput.topic,
-        start_time: toolInput.start_time,
-        duration: toolInput.duration,
-        agenda: toolInput.agenda
-      });
+// Execute tool calls
+async function executeToolCall(toolName, toolInput, userId) {
+  console.log(`Executing ${toolName} for user ${userId}`);
 
-    case "create_calendar_event":
-      return await calendarClient.createEvent({
-        summary: toolInput.summary,
-        start: { dateTime: toolInput.start_time },
-        end: { dateTime: toolInput.end_time },
-        description: toolInput.description,
-        location: toolInput.location
-      });
-
-    default:
-      throw new Error(`Unknown tool: ${toolName}`);
+  if (toolName === "create_zoom_meeting") {
+    return await zoomClient.createMeeting(toolInput);
   }
+
+  if (toolName === "create_calendar_event") {
+    const user = db.getUser(userId);
+    if (!user || !user.google_access_token) {
+      throw new Error('User has not connected Google Calendar');
+    }
+
+    return await googleClient.createEventForUser(
+      {
+        access_token: user.google_access_token,
+        refresh_token: user.google_refresh_token
+      },
+      toolInput
+    );
+  }
+
+  throw new Error(`Unknown tool: ${toolName}`);
 }
 
-// API endpoint
+// ============ AUTH ROUTES ============
+
+// Get Google OAuth URL
+app.get('/auth/google/url', (req, res) => {
+  const authUrl = googleClient.getAuthUrl();
+  res.json({ authUrl });
+});
+
+// Handle OAuth callback
+app.get('/auth/google/callback', async (req, res) => {
+  try {
+    const { code } = req.query;
+    if (!code) {
+      return res.redirect('/?error=no_code');
+    }
+
+    // Exchange code for tokens
+    const tokens = await googleClient.getTokensFromCode(code);
+
+    // Get user's email
+    const email = await googleClient.getUserEmail(tokens);
+
+    // Save tokens to database
+    db.updateGoogleTokens(email, tokens);
+
+    console.log(`✅ User ${email} connected Google Calendar`);
+    res.redirect('/?connected=true');
+  } catch (error) {
+    console.error('OAuth callback error:', error);
+    res.redirect('/?error=auth_failed');
+  }
+});
+
+// Check connection status
+app.get('/auth/google/status', (req, res) => {
+  const { userId } = req.query;
+  if (!userId) {
+    return res.json({ connected: false });
+  }
+  const connected = db.hasGoogleCalendar(userId);
+  res.json({ connected });
+});
+
+// ============ AGENT ROUTE ============
+
 app.post('/api/agent', async (req, res) => {
   try {
-    const { message, conversationHistory } = req.body;
+    const { message, userId, conversationHistory = [] } = req.body;
 
-    // Build message history for Claude
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+
+    // Check if user has connected Google Calendar
+    if (!db.hasGoogleCalendar(userId)) {
+      return res.json({
+        response: "⚠️ Please connect your Google Calendar first! Click the 'Connect Google Calendar' button.",
+        requiresAuth: true
+      });
+    }
+
+    console.log(`User ${userId} request: ${message}`);
+
+    // Build message history
     const messages = [
       ...conversationHistory,
       { role: "user", content: message }
@@ -147,13 +180,12 @@ app.post('/api/agent', async (req, res) => {
     // Handle tool calls (agentic loop)
     while (response.stop_reason === "tool_use") {
       const toolUse = response.content.find(block => block.type === "tool_use");
-
-      console.log(`Executing tool: ${toolUse.name}`);
+      console.log(`Claude calling: ${toolUse.name}`);
 
       // Execute the tool
-      const toolResult = await executeToolCall(toolUse.name, toolUse.input);
+      const toolResult = await executeToolCall(toolUse.name, toolUse.input, userId);
 
-      // Send tool result back to Claude
+      // Continue conversation
       messages.push({ role: "assistant", content: response.content });
       messages.push({
         role: "user",
@@ -164,7 +196,7 @@ app.post('/api/agent', async (req, res) => {
         }]
       });
 
-      // Get next response from Claude
+      // Get next response
       response = await anthropic.messages.create({
         model: "claude-sonnet-4-20250514",
         max_tokens: 4096,
@@ -174,7 +206,7 @@ app.post('/api/agent', async (req, res) => {
       });
     }
 
-    // Extract final text response
+    // Extract final response
     const finalResponse = response.content
       .filter(block => block.type === "text")
       .map(block => block.text)

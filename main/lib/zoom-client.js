@@ -3,10 +3,11 @@
 import axios from 'axios';
 
 export class ZoomClient {
-  constructor({ accountId, clientId, clientSecret }) {
+  constructor({ accountId, clientId, clientSecret, userEmail }) {
     this.accountId = accountId;
     this.clientId = clientId;
     this.clientSecret = clientSecret;
+    this.userEmail = userEmail || 'me';
     this.accessToken = null;
   }
 
@@ -37,7 +38,7 @@ export class ZoomClient {
     }
 
     const response = await axios.post(
-      'https://api.zoom.us/v2/users/me/meetings',
+      `https://api.zoom.us/v2/users/${this.userEmail}/meetings`,
       {
         topic,
         type: 2, // Scheduled meeting
@@ -46,7 +47,8 @@ export class ZoomClient {
         agenda,
         settings: {
           join_before_host: true,
-          mute_upon_entry: false
+          mute_upon_entry: false,
+          auto_recording: 'none'
         }
       },
       {
@@ -62,7 +64,8 @@ export class ZoomClient {
       join_url: response.data.join_url,
       passcode: response.data.password,
       start_time: response.data.start_time,
-      topic: response.data.topic
+      topic: response.data.topic,
+      duration: response.data.duration
     };
   }
 }

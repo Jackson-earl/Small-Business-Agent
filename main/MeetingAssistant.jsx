@@ -1,6 +1,6 @@
 // Frontend, Button + Chat UI
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Anthropic from '@anthropic-ai/sdk';
 
 // This is the button + chat interface your users will interact with
@@ -9,6 +9,62 @@ function MeetingAssistant() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Draggable state
+  const [position, setPosition] = useState({ x: 20, y: 20 });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStart = useRef({ x: 0, y: 0 });
+  const hasDragged = useRef(false);
+
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!isDragging) return;
+
+      const deltaX = dragStart.current.x - e.clientX;
+      const deltaY = dragStart.current.y - e.clientY;
+
+      if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
+        hasDragged.current = true;
+      }
+
+      setPosition({
+        x: Math.max(0, Math.min(window.innerWidth - 60, dragStart.current.posX + deltaX)),
+        y: Math.max(0, Math.min(window.innerHeight - 60, dragStart.current.posY + deltaY))
+      });
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    if (isDragging) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging]);
+
+  const handleMouseDown = (e) => {
+    e.preventDefault();
+    hasDragged.current = false;
+    dragStart.current = {
+      x: e.clientX,
+      y: e.clientY,
+      posX: position.x,
+      posY: position.y
+    };
+    setIsDragging(true);
+  };
+
+  const handleClick = () => {
+    if (!hasDragged.current) {
+      setIsOpen(true);
+    }
+  };
 
   // Handle sending a message to the AI agent
   const handleSendMessage = async () => {
@@ -54,11 +110,12 @@ function MeetingAssistant() {
       {/* The Button - This is what users click */}
       {!isOpen && (
         <button
-          onClick={() => setIsOpen(true)}
+          onMouseDown={handleMouseDown}
+          onClick={handleClick}
           style={{
             position: 'fixed',
-            bottom: '20px',
-            right: '20px',
+            bottom: `${position.y}px`,
+            right: `${position.x}px`,
             width: '60px',
             height: '60px',
             borderRadius: '50%',
@@ -66,9 +123,10 @@ function MeetingAssistant() {
             color: 'white',
             border: 'none',
             fontSize: '24px',
-            cursor: 'pointer',
+            cursor: isDragging ? 'grabbing' : 'grab',
             boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-            zIndex: 1000
+            zIndex: 1000,
+            userSelect: 'none'
           }}
         >
           📅
@@ -79,8 +137,8 @@ function MeetingAssistant() {
       {isOpen && (
         <div style={{
           position: 'fixed',
-          bottom: '20px',
-          right: '20px',
+          bottom: `${position.y}px`,
+          right: `${position.x}px`,
           width: '400px',
           height: '600px',
           backgroundColor: 'white',

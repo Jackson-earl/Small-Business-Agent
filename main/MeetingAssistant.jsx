@@ -69,7 +69,8 @@ function MeetingAssistant() {
   // Determine if button is on the left side of the screen
   // position.x is distance from right edge, so large x = left side
   const isOnLeftSide = position.x > window.innerWidth / 2;
-  const isNearBottom = position.y < 620; // chat height + some margin
+  // position.y is distance from bottom, so large y = upper half
+  const isOnUpperHalf = position.y > window.innerHeight / 2;
 
   // Handle sending a message to the AI agent
   const handleSendMessage = async () => {
@@ -142,8 +143,8 @@ function MeetingAssistant() {
       {isOpen && (
         <div style={{
           position: 'fixed',
-          bottom: isNearBottom ? `${position.y}px` : 'auto',
-          top: isNearBottom ? 'auto' : `${window.innerHeight - position.y - 600}px`,
+          bottom: isOnUpperHalf ? 'auto' : `${position.y}px`,
+          top: isOnUpperHalf ? `${window.innerHeight - position.y - 60}px` : 'auto',
           right: isOnLeftSide ? 'auto' : `${position.x}px`,
           left: isOnLeftSide ? `${window.innerWidth - position.x - 60}px` : 'auto',
           width: '400px',

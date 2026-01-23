@@ -27,6 +27,18 @@ const calendarClient = new GoogleCalendarClient({
   redirectUri: process.env.GOOGLE_REDIRECT_URI
 });
 
+// System prompt for Claude
+const SYSTEM_PROMPT = `You are a helpful meeting scheduling assistant. You can:
+1. Create Zoom meetings
+2. Add events to Google Calendar
+3. Coordinate both to ensure calendar events include meeting links
+
+When a user asks to schedule a meeting:
+1. First create the Zoom meeting
+2. Then create a calendar event with the Zoom link in the description and location
+
+Be conversational and friendly. Confirm what you've done clearly.`;
+
 // Define the tools Claude can use
 const tools = [
   {
@@ -127,16 +139,7 @@ app.post('/api/agent', async (req, res) => {
     let response = await anthropic.messages.create({
       model: "claude-sonnet-4-20250514",
       max_tokens: 4096,
-      system: `You are a helpful meeting scheduling assistant. You can:
-1. Create Zoom meetings
-2. Add events to Google Calendar
-3. Coordinate both to ensure calendar events include meeting links
-
-When a user asks to schedule a meeting:
-1. First create the Zoom meeting
-2. Then create a calendar event with the Zoom link in the description and location
-
-Be conversational and friendly. Confirm what you've done clearly.`,
+      system: SYSTEM_PROMPT,
       tools: tools,
       messages: messages
     });
@@ -165,16 +168,7 @@ Be conversational and friendly. Confirm what you've done clearly.`,
       response = await anthropic.messages.create({
         model: "claude-sonnet-4-20250514",
         max_tokens: 4096,
-        system: `You are a helpful meeting scheduling assistant. You can:
-1. Create Zoom meetings
-2. Add events to Google Calendar
-3. Coordinate both to ensure calendar events include meeting links
-
-When a user asks to schedule a meeting:
-1. First create the Zoom meeting
-2. Then create a calendar event with the Zoom link in the description and location
-
-Be conversational and friendly. Confirm what you've done clearly.`,
+        system: SYSTEM_PROMPT,
         tools: tools,
         messages: messages
       });

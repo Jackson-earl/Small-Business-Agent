@@ -3,6 +3,7 @@ node_modules/
 dist/
 .cache/
 *.log
+.vite/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -51,7 +51,8 @@ Save to `{@artifacts_path}/plan.md`. If the feature is trivial and doesn't warra
 
 ---
 
-### [ ] Step: Create package.json and install dependencies
+### [x] Step: Create package.json and install dependencies
+<!-- chat-id: 9693681e-07b5-4e61-bd2e-711a4bb09bf4 -->
 
 Create `package.json` with all required dependencies and npm scripts for running the demo.
 

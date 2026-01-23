@@ -18,7 +18,8 @@ Do not make assumptions on important decisions — get clarification first.
 
 ## Workflow Steps
 
-### [ ] Step: Technical Specification
+### [x] Step: Technical Specification
+<!-- chat-id: 3794c26c-37c0-4558-aba0-cb47cfedb9aa -->
 
 Assess the task's difficulty, as underestimating it leads to poor outcomes.
 - easy: Straightforward implementation, trivial bug fix or feature
@@ -50,15 +51,42 @@ Save to `{@artifacts_path}/plan.md`. If the feature is trivial and doesn't warra
 
 ---
 
-### [ ] Step: Implementation
+### [ ] Step: Create package.json and install dependencies
 
-Implement the task according to the technical specification and general engineering best practices.
+Create `package.json` with all required dependencies and npm scripts for running the demo.
 
-1. Break the task into steps where possible.
-2. Implement the required changes in the codebase.
-3. Add and run relevant tests and linters.
-4. Perform basic manual verification if applicable.
-5. After completion, write a report to `{@artifacts_path}/report.md` describing:
-   - What was implemented
-   - How the solution was tested
-   - The biggest issues or challenges encountered
+---
+
+### [ ] Step: Create frontend entry point files
+
+Create the following files:
+- `index.html` - HTML entry point
+- `main/main.jsx` - React app bootstrapping
+- `main/App.jsx` - Root component wrapping MeetingAssistant
+
+---
+
+### [ ] Step: Create Express backend server
+
+Create `server.js` with Express to serve the `/api/agent` endpoint.
+
+---
+
+### [ ] Step: Configure Vite with API proxy
+
+Create `vite.config.js` to proxy `/api` requests to the backend server.
+
+---
+
+### [ ] Step: Update .gitignore for Node.js
+
+Add `node_modules/`, `dist/`, and other Node.js artifacts to `.gitignore`.
+
+---
+
+### [ ] Step: Test the demo
+
+1. Run `npm install`
+2. Run `npm run dev`
+3. Open browser to verify the Meeting Assistant UI loads
+4. Write completion report to `{@artifacts_path}/report.md`

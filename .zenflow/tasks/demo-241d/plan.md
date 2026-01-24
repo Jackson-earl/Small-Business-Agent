@@ -58,7 +58,7 @@ Create `package.json` with all required dependencies and npm scripts for running
 
 ---
 
-### [ ] Step: Create frontend entry point files
+### [x] Step: Create frontend entry point files
 
 Create the following files:
 - `index.html` - HTML entry point
@@ -67,19 +67,19 @@ Create the following files:
 
 ---
 
-### [ ] Step: Create Express backend server
+### [x] Step: Create Express backend server
 
 Create `server.js` with Express to serve the `/api/agent` endpoint.
 
 ---
 
-### [ ] Step: Configure Vite with API proxy
+### [x] Step: Configure Vite with API proxy
 
 Create `vite.config.js` to proxy `/api` requests to the backend server.
 
 ---
 
-### [ ] Step: Update .gitignore for Node.js
+### [x] Step: Update .gitignore for Node.js
 
 Add `node_modules/`, `dist/`, and other Node.js artifacts to `.gitignore`.
 
